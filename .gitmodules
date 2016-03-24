@@ -1,0 +1,3 @@
+[submodule "pcf-azure"]
+	path = pcf-azure
+	url = https://github.com/cdelashmutt-pivotal/pcf-azure
