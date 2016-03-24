@@ -1,0 +1,61 @@
+#!/bin/bash
+set -e
+
+DOWNLOAD_DIR=~/.pcf-downloads
+
+TEMP=`getopt -o h,p:,a: --long help,productUrl:,apiKey: -n 'install-tile' -- "$@"`
+eval set -- "$TEMP"
+
+function printUsage {
+  cat <<USAGE_TEXT
+usage: $0 [options]
+
+  Options:
+    -p, --productUrl <producturl>  The product download URL for the product to download from network.pivotal.io
+    -a, --apiKey <apikey>          The API from your network.pivotal.io account to use to download
+
+    -h, --help  display this help and exit
+USAGE_TEXT
+}
+
+while true ; do
+  case "$1" in
+    -p|--productUrl)
+      PRODUCT_URL=$2 ; shift 2 ;;
+    -a|--apiKey)
+      API_KEY=$2 ; shift 2 ;;
+    --) shift ; break ;;
+    *) printUsage; exit 1 ;;
+  esac
+done
+
+if [ -z "$PRODUCT_URL" ]; then
+  echo "ERROR: No product url given"
+  echo
+  printUsage
+  exit 1
+fi
+
+if [ -z "$API_KEY" ]; then
+  echo "ERROR: No api key given"
+  echo
+  printUsage
+  exit
+fi
+
+mkdir -p $DOWNLOAD_DIR
+
+product_release_path=`dirname $PRODUCT_URL`
+download_name=`curl -X GET -H "Authorization: Token $API_KEY" $product_release_path | jq -r '.product_file.aws_object_key'`
+download_name=`basename $download_name`
+wget -c -O "$DOWNLOAD_DIR/$download_name" --post-data="" --header="Authorization: Token $API_KEY" $PRODUCT_URL
+download_name_base=${download_name%.*}
+mkdir -p $DOWNLOAD_DIR/$download_name_base
+cd $DOWNLOAD_DIR/$download_name_base
+unzip $DOWNLOAD_DIR/$download_name
+
+for release in $DOWNLOAD_DIR/$download_name_base/releases/*; do
+  bosh upload release $release
+done
+
+rm -rf $DOWNLOAD_DIR/$download_name_base $DOWNLOAD_DIR/$download_name
